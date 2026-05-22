@@ -43,9 +43,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 async function cargarDatosDesdeSupabase() {
     try {
         const { data, error } = await supabaseClient
-            .from('partidas')
+            .from('stats') // aqui busca la tabla 'stats'
             .select('*')
-            .order('id', { ascending: false }); // <-- CAMBIADO: Usamos 'id' en lugar de 'created_at'
+            .order('id', { ascending: false }); // Usamos id para evitar el error si no creaste created_at
 
         if (error) throw error;
 
@@ -76,7 +76,7 @@ async function guardarEstadisticas(event) {
 
     try {
         const { error } = await supabaseClient
-            .from('partidas')
+            .from('stats') // aqui busca la tabla 'stats'
             .insert([
                 { jugador: nombre, agente: agente, kills: k, deaths: d, assists: a, acs: acs }
             ]);
