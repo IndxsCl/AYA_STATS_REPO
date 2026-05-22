@@ -1,88 +1,105 @@
 <!DOCTYPE html>
 <html lang="es">
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js"></script>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Valorant Squad Tracker</title>
+    <title>VALORANT Squad Stats</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-
-    <header class="main-header">
-        <h1>VALORANT <span>SQUAD TRACKER</span></h1>
-    </header>
-
-    <main class="container">
-        <section class="card-panel">
-            <h2>Registrar Nueva Partida</h2>
+    <div class="container">
+        
+        <section class="card-section">
+            <h2 class="section-title">Registrar Nueva Partida</h2>
             <form id="stats-form">
                 <div class="form-grid">
                     <div class="form-group">
                         <label for="player-name">Jugador</label>
                         <select id="player-name" required>
                             <option value="" disabled selected>Selecciona jugador...</option>
-                            <option value="Joker">Joker</option>
-                            <option value="Viper">Viper</option>
-                            <option value="Phoenix">Phoenix</option>
-                            <option value="Sova">Sova</option>
+                            <option value="InDxs">InDxs</option>
+                            <option value="Tero">Tero</option>
+                            <option value="Kr1mn">Kr1mn</option>
+                            <option value="Vylack">Vylack</option>
+                            <option value="Potato">Potato</option>
+                            <option value="Kaponi">Kaponi</option>
                         </select>
                     </div>
-
+                    
                     <div class="form-group">
                         <label for="agent-name">Agente</label>
                         <select id="agent-name" required>
                             <option value="" disabled selected>Selecciona agente...</option>
                             <option value="Jett">Jett</option>
-                            <option value="Reyna">Reyna</option>
                             <option value="Raze">Raze</option>
+                            <option value="Reyna">Reyna</option>
+                            <option value="Phoenix">Phoenix</option>
+                            <option value="Neon">Neon</option>
+                            <option value="Yoru">Yoru</option>
+                            <option value="Sova">Sova</option>
+                            <option value="Fade">Fade</option>
+                            <option value="Breach">Breach</option>
+                            <option value="Skye">Skye</option>
+                            <option value="KAY/O">KAY/O</option>
+                            <option value="Gekko">Gekko</option>
                             <option value="Omen">Omen</option>
+                            <option value="Viper">Viper</option>
+                            <option value="Brimstone">Brimstone</option>
+                            <option value="Astra">Astra</option>
+                            <option value="Harbor">Harbor</option>
+                            <option value="Clove">Clove</option>
                             <option value="Killjoy">Killjoy</option>
+                            <option value="Cypher">Cypher</option>
                             <option value="Sage">Sage</option>
+                            <option value="Deadlock">Deadlock</option>
+                            <option value="Chamber">Chamber</option>
+                            <option value="Iso">Iso</option>
+                            <option value="Waylay">Waylay</option>
+                            <option value="Tejo">Tejo</option>
+                            <option value="Vyse">Vyse</option>
                         </select>
                     </div>
-
+                    
                     <div class="form-group">
                         <label for="kills">Kills (K)</label>
-                        <input type="number" id="kills" min="0" placeholder="0" required>
+                        <input type="number" id="kills" min="0" value="0" required>
                     </div>
-
+                    
                     <div class="form-group">
                         <label for="deaths">Deaths (D)</label>
-                        <input type="number" id="deaths" min="0" placeholder="0" required>
+                        <input type="number" id="deaths" min="0" value="0" required>
                     </div>
-
+                    
                     <div class="form-group">
                         <label for="assists">Assists (A)</label>
-                        <input type="number" id="assists" min="0" placeholder="0" required>
+                        <input type="number" id="assists" min="0" value="0" required>
                     </div>
-
+                    
                     <div class="form-group">
                         <label for="acs">ACS</label>
                         <input type="number" id="acs" min="0" placeholder="Promedio de Combate" required>
                     </div>
                 </div>
-
+                
                 <div class="form-actions">
                     <button type="submit" class="btn-submit">Guardar Estadísticas</button>
-                    <button type="button" id="btn-delete" class="btn-danger">Resetear Todo</button>
+                    <button type="button" id="btn-delete" class="btn-reset">Resetear Todo</button>
                 </div>
             </form>
         </section>
 
-        <section class="card-panel">
-            <div class="panel-header-flex">
-                <h2>Tabla General de la Squad</h2>
-                <div class="filter-timeline-container">
+        <section class="card-section">
+            <div class="section-header-flex">
+                <h2 class="section-title">Tabla General de la Squad</h2>
+                <div class="filter-buttons">
                     <button id="filter-all" class="btn-filter active">Acumulado</button>
                     <button id="filter-week" class="btn-filter">Esta Semana</button>
                 </div>
             </div>
-
-            <div class="table-responsive">
-                <table>
+            
+            <div class="table-container">
+                <table class="stats-table">
                     <thead>
                         <tr>
                             <th>JUGADOR</th>
@@ -94,17 +111,22 @@
                         </tr>
                     </thead>
                     <tbody id="stats-table-body">
-                        </tbody>
+                        <tr>
+                            <td colspan="6" style="text-align:center; color:#9ca3af;">Cargando historial desde Supabase...</td>
+                        </tr>
+                    </tbody>
                 </table>
             </div>
         </section>
 
-        <section class="card-panel">
-            <h2>Rendimiento Individual por Personajes</h2>
+        <section class="card-section">
+            <h2 class="section-title">Rendimiento Individual por Personajes</h2>
             <div id="tabs-container">
-                </div>
+                <p style="color: #9ca3af; text-align: center; padding: 20px;">Cargando tarjetas de personajes...</p>
+            </div>
         </section>
-    </main>
+
+    </div>
 
     <script src="app.js"></script>
 </body>

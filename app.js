@@ -1,15 +1,16 @@
-// CONFIGURACIÓN DE SUPABASE (Reemplaza con tus datos reales)
-const SUPABASE_URL = "https://vacdptnjqqwncgfarfwf.supabase.co/rest/v1/";
+// CONFIGURACIÓN DE SUPABASE
+const SUPABASE_URL = "https://vacdptnjqqwncgfarfwf.supabase.co"; // Sin el /rest/v1/
 const SUPABASE_ANON_KEY = "sb_publishable_2GFclghGWnF-dlUTCYK49A_QOuRzAcd";
 
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Usamos un nombre diferente para no chocar con la librería global "supabase"
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Variables de estado de la aplicación
-let listaPartidasGlobal = []; // Almacenará todas las partidas bajadas de Supabase
+let listaPartidasGlobal = [];
 let jugadorActivoTab = ""; 
 let columnaOrdenada = ""; 
 let ordenAscendente = false; 
-let filtroTemporal = "all"; // "all" o "week"
+let filtroTemporal = "all"; 
 
 document.addEventListener("DOMContentLoaded", async () => {
     const statsForm = document.getElementById('stats-form');
@@ -42,19 +43,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     await cargarDatosDesdeSupabase();
 });
 
-// Obtiene todo el historial de la base de datos de Supabase
 async function cargarDatosDesdeSupabase() {
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('partidas')
             .select('*')
-            .order('fecha', { ascending: false });
+            .order('created_at', { ascending: false }); // Cambiado de 'fecha' a 'created_at'
 
         if (error) throw error;
 
         listaPartidasGlobal = data || [];
         
-        // Establecer el primer jugador con datos como pestaña activa por defecto
         if (listaPartidasGlobal.length > 0 && !jugadorActivoTab) {
             jugadorActivoTab = listaPartidasGlobal[0].jugador;
         }
@@ -66,7 +65,6 @@ async function cargarDatosDesdeSupabase() {
     }
 }
 
-// Inserta una nueva fila en la tabla de Supabase
 async function guardarEstadisticas(event) {
     event.preventDefault();
 
@@ -80,7 +78,7 @@ async function guardarEstadisticas(event) {
     if (!nombre || !agente) return;
 
     try {
-        const { error } = await supabase
+        const { error } = await supabaseClient
             .from('partidas')
             .insert([
                 { jugador: nombre, agente: agente, kills: k, deaths: d, assists: a, acs: acs }
@@ -90,10 +88,7 @@ async function guardarEstadisticas(event) {
 
         jugadorActivoTab = nombre;
 
-        // Limpiar el formulario
         document.getElementById('stats-form').reset();
-
-        // Recargar datos actualizados de la nube
         await cargarDatosDesdeSupabase();
 
     } catch (error) {
@@ -102,14 +97,12 @@ async function guardarEstadisticas(event) {
     }
 }
 
-// Función auxiliar para verificar si una fecha está dentro de los últimos 7 días
 function esDeEstaSemana(fechaString) {
     const fechaPartida = new Date(fechaString);
     const sieteDiasEnMilisegundos = 7 * 24 * 60 * 60 * 1000;
     return (Date.now() - fechaPartida.getTime()) < sieteDiasEnMilisegundos;
 }
 
-// Procesa el array plano global y actualiza la Tabla e Interfaz
 function procesarYRenderizarVistas() {
     actualizarTablaGeneral();
     renderizarPestañasAgentes();
@@ -125,12 +118,12 @@ function actualizarTablaGeneral() {
         return;
     }
 
-    // Agrupamos dinámicamente según el filtro activo (Acumulado o Semanal)
     let resumenJugadores = {};
 
     listaPartidasGlobal.forEach(partida => {
-        if (filtroTemporal === "week" && !esDeEstaSemana(partida.fecha)) {
-            return; // Ignorar si el filtro es semanal y la partida es vieja
+        // Usamos created_at en lugar de fecha
+        if (filtroTemporal === "week" && !esDeEstaSemana(partida.created_at)) {
+            return; 
         }
 
         const j = partida.jugador;
@@ -169,7 +162,6 @@ function actualizarTablaGeneral() {
         return;
     }
 
-    // Ordenamiento de columnas
     if (columnaOrdenada) {
         listaJugadores.sort((a, b) => {
             let valA, valB;
@@ -188,7 +180,6 @@ function actualizarTablaGeneral() {
         });
     }
 
-    // Renderizado físico en la tabla
     listaJugadores.forEach(jugador => {
         const avgK = (jugador.kills / jugador.partidas).toFixed(1);
         const avgD = (jugador.deaths / jugador.partidas).toFixed(1);
@@ -215,7 +206,6 @@ function renderizarPestañasAgentes() {
     if (!container) return;
     container.innerHTML = '';
 
-    // Obtener lista única de jugadores que tienen al menos una partida registrada
     const jugadoresUnicos = [...new Set(listaPartidasGlobal.map(p => p.jugador))];
 
     if (jugadoresUnicos.length === 0) {
@@ -227,7 +217,6 @@ function renderizarPestañasAgentes() {
         jugadorActivoTab = jugadoresUnicos[0];
     }
 
-    // Renderizar botones de navegación de pestañas
     const nav = document.createElement('div');
     nav.className = 'player-tabs-nav';
 
@@ -246,12 +235,12 @@ function renderizarPestañasAgentes() {
     const grid = document.createElement('div');
     grid.className = 'agent-grid-display';
 
-    // Agrupar estadísticas por agente para el jugador seleccionado
     let agentesAgrupados = {};
 
     listaPartidasGlobal.forEach(p => {
         if (p.jugador !== jugadorActivoTab) return;
-        if (filtroTemporal === "week" && !esDeEstaSemana(p.fecha)) return;
+        // Usamos created_at en lugar de fecha
+        if (filtroTemporal === "week" && !esDeEstaSemana(p.created_at)) return;
 
         if (!agentesAgrupados[p.agente]) {
             agentesAgrupados[p.agente] = { partidas: 0, kills: 0, deaths: 0, assists: 0, acs: 0 };
@@ -326,14 +315,13 @@ function actualizarIndicadoresEncabezado() {
     });
 }
 
-// Borra todas las filas de la tabla en Supabase
 async function borrarTodo() {
     if (confirm("¿Seguro que quieres eliminar TODO el historial de la base de datos en Supabase?")) {
         try {
-            const { error } = await supabase
+            const { error } = await supabaseClient
                 .from('partidas')
                 .delete()
-                .neq('id', 0); // Truco para borrar todas las filas de forma segura
+                .neq('id', 0); 
 
             if (error) throw error;
 
