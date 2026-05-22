@@ -45,8 +45,7 @@ async function cargarDatosDesdeSupabase() {
         const { data, error } = await supabaseClient
             .from('partidas')
             .select('*')
-            // Se ordena por id de forma descendente para evitar errores si "created_at" no está configurado
-            .order('id', { ascending: false }); 
+            .order('id', { ascending: false }); // <-- CAMBIADO: Usamos 'id' en lugar de 'created_at'
 
         if (error) throw error;
 
@@ -94,8 +93,9 @@ async function guardarEstadisticas(event) {
     }
 }
 
+// También modifica esta función para evitar que falle si no encuentra la fecha:
 function esDeEstaSemana(fechaString) {
-    if (!fechaString) return false; // Previene error si created_at es null o no existe
+    if (!fechaString) return false; // Evita errores si created_at no viene en la respuesta
     const fechaPartida = new Date(fechaString);
     const sieteDiasEnMilisegundos = 7 * 24 * 60 * 60 * 1000;
     return (Date.now() - fechaPartida.getTime()) < sieteDiasEnMilisegundos;
