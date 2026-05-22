@@ -1,8 +1,7 @@
 // CONFIGURACIÓN DE SUPABASE
-const SUPABASE_URL = "https://vacdptnjqqwncgfarfwf.supabase.co"; // Sin el /rest/v1/
+const SUPABASE_URL = "https://vacdptnjqqwncgfarfwf.supabase.co"; 
 const SUPABASE_ANON_KEY = "sb_publishable_2GFclghGWnF-dlUTCYK49A_QOuRzAcd";
 
-// Usamos un nombre diferente para no chocar con la librería global "supabase"
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Variables de estado de la aplicación
@@ -14,12 +13,10 @@ let filtroTemporal = "all";
 
 document.addEventListener("DOMContentLoaded", async () => {
     const statsForm = document.getElementById('stats-form');
-    const btnDelete = document.getElementById('btn-delete');
     const btnFilterAll = document.getElementById('filter-all');
     const btnFilterWeek = document.getElementById('filter-week');
 
     if (statsForm) statsForm.addEventListener('submit', guardarEstadisticas);
-    if (btnDelete) btnDelete.addEventListener('click', borrarTodo);
 
     if (btnFilterAll && btnFilterWeek) {
         btnFilterAll.addEventListener('click', () => {
@@ -48,7 +45,8 @@ async function cargarDatosDesdeSupabase() {
         const { data, error } = await supabaseClient
             .from('partidas')
             .select('*')
-            .order('created_at', { ascending: false }); // Cambiado de 'fecha' a 'created_at'
+            // Se ordena por id de forma descendente para evitar errores si "created_at" no está configurado
+            .order('id', { ascending: false }); 
 
         if (error) throw error;
 
@@ -87,7 +85,6 @@ async function guardarEstadisticas(event) {
         if (error) throw error;
 
         jugadorActivoTab = nombre;
-
         document.getElementById('stats-form').reset();
         await cargarDatosDesdeSupabase();
 
@@ -98,6 +95,7 @@ async function guardarEstadisticas(event) {
 }
 
 function esDeEstaSemana(fechaString) {
+    if (!fechaString) return false; // Previene error si created_at es null o no existe
     const fechaPartida = new Date(fechaString);
     const sieteDiasEnMilisegundos = 7 * 24 * 60 * 60 * 1000;
     return (Date.now() - fechaPartida.getTime()) < sieteDiasEnMilisegundos;
@@ -121,7 +119,6 @@ function actualizarTablaGeneral() {
     let resumenJugadores = {};
 
     listaPartidasGlobal.forEach(partida => {
-        // Usamos created_at en lugar de fecha
         if (filtroTemporal === "week" && !esDeEstaSemana(partida.created_at)) {
             return; 
         }
@@ -239,7 +236,6 @@ function renderizarPestañasAgentes() {
 
     listaPartidasGlobal.forEach(p => {
         if (p.jugador !== jugadorActivoTab) return;
-        // Usamos created_at en lugar de fecha
         if (filtroTemporal === "week" && !esDeEstaSemana(p.created_at)) return;
 
         if (!agentesAgrupados[p.agente]) {
@@ -313,26 +309,4 @@ function actualizarIndicadoresEncabezado() {
             th.style.color = '#9ca3af'; 
         }
     });
-}
-
-async function borrarTodo() {
-    if (confirm("¿Seguro que quieres eliminar TODO el historial de la base de datos en Supabase?")) {
-        try {
-            const { error } = await supabaseClient
-                .from('partidas')
-                .delete()
-                .neq('id', 0); 
-
-            if (error) throw error;
-
-            listaPartidasGlobal = [];
-            jugadorActivoTab = "";
-            columnaOrdenada = "";
-            procesarYRenderizarVistas();
-
-        } catch (error) {
-            console.error("Error al vaciar BD:", error.message);
-            alert("No se pudo limpiar la base de datos.");
-        }
-    }
 }

@@ -8,9 +8,12 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
+    <header class="main-header">
+        <h1><span>VALORANT</span> Squad Stats</h1>
+    </header>
+    
     <div class="container">
-        
-        <section class="card-section">
+        <div class="card-panel">
             <h2 class="section-title">Registrar Nueva Partida</h2>
             <form id="stats-form">
                 <div class="form-grid">
@@ -84,22 +87,21 @@
                 
                 <div class="form-actions">
                     <button type="submit" class="btn-submit">Guardar Estadísticas</button>
-                    <button type="button" id="btn-delete" class="btn-reset">Resetear Todo</button>
                 </div>
             </form>
-        </section>
+        </div>
 
-        <section class="card-section">
-            <div class="section-header-flex">
+        <div class="card-panel">
+            <div class="panel-header-flex">
                 <h2 class="section-title">Tabla General de la Squad</h2>
-                <div class="filter-buttons">
+                <div class="filter-timeline-container">
                     <button id="filter-all" class="btn-filter active">Acumulado</button>
                     <button id="filter-week" class="btn-filter">Esta Semana</button>
                 </div>
             </div>
             
-            <div class="table-container">
-                <table class="stats-table">
+            <div class="table-responsive">
+                <table>
                     <thead>
                         <tr>
                             <th>JUGADOR</th>
@@ -117,14 +119,14 @@
                     </tbody>
                 </table>
             </div>
-        </section>
+        </div>
 
-        <section class="card-section">
+        <div class="card-panel">
             <h2 class="section-title">Rendimiento Individual por Personajes</h2>
             <div id="tabs-container">
                 <p style="color: #9ca3af; text-align: center; padding: 20px;">Cargando tarjetas de personajes...</p>
             </div>
-        </section>
+        </div>
 
     </div>
 
