@@ -1,15 +1,17 @@
-// Estructura de la base de datos protegida para no perder datos previos cargados
-let baseDatos = JSON.parse(localStorage.getItem('valorant_squad_db')) || {};
-let jugadorActivoTab = ""; // Almacena qué pestaña de jugador estamos viendo
+// CONFIGURACIÓN DE SUPABASE (Reemplaza con tus datos reales)
+const SUPABASE_URL = "https://vacdptnjqqwncgfarfwf.supabase.co/rest/v1/";
+const SUPABASE_ANON_KEY = "sb_publishable_2GFclghGWnF-dlUTCYK49A_QOuRzAcd";
 
-// Variables para controlar el ordenamiento de la tabla general
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Variables de estado de la aplicación
+let listaPartidasGlobal = []; // Almacenará todas las partidas bajadas de Supabase
+let jugadorActivoTab = ""; 
 let columnaOrdenada = ""; 
-let ordenAscendente = false; // Por defecto ordenará de mayor a menor (descendente)
+let ordenAscendente = false; 
+let filtroTemporal = "all"; // "all" o "week"
 
-// Control de filtros temporales
-let filtroTemporal = "all"; // "all" = Acumulado total, "week" = Solo los últimos 7 días
-
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
     const statsForm = document.getElementById('stats-form');
     const btnDelete = document.getElementById('btn-delete');
     const btnFilterAll = document.getElementById('filter-all');
@@ -18,34 +20,54 @@ document.addEventListener("DOMContentLoaded", () => {
     if (statsForm) statsForm.addEventListener('submit', guardarEstadisticas);
     if (btnDelete) btnDelete.addEventListener('click', borrarTodo);
 
-    // Eventos para interactuar con los botones de tiempo
     if (btnFilterAll && btnFilterWeek) {
         btnFilterAll.addEventListener('click', () => {
             filtroTemporal = "all";
             btnFilterAll.classList.add('active');
             btnFilterWeek.classList.remove('active');
-            actualizarTablaGeneral();
-            renderizarPestañasAgentes();
+            procesarYRenderizarVistas();
         });
 
         btnFilterWeek.addEventListener('click', () => {
             filtroTemporal = "week";
             btnFilterWeek.classList.add('active');
             btnFilterAll.classList.remove('active');
-            actualizarTablaGeneral();
-            renderizarPestañasAgentes();
+            procesarYRenderizarVistas();
         });
     }
 
-    // Configurar los encabezados de la tabla para que reaccionen al clic
     configurarEncabezadosOrdenables();
 
-    // Inicializar vistas de la aplicación
-    actualizarTablaGeneral();
-    renderizarPestañasAgentes();
+    // Carga inicial de datos desde la nube
+    await cargarDatosDesdeSupabase();
 });
 
-function guardarEstadisticas(event) {
+// Obtiene todo el historial de la base de datos de Supabase
+async function cargarDatosDesdeSupabase() {
+    try {
+        const { data, error } = await supabase
+            .from('partidas')
+            .select('*')
+            .order('fecha', { ascending: false });
+
+        if (error) throw error;
+
+        listaPartidasGlobal = data || [];
+        
+        // Establecer el primer jugador con datos como pestaña activa por defecto
+        if (listaPartidasGlobal.length > 0 && !jugadorActivoTab) {
+            jugadorActivoTab = listaPartidasGlobal[0].jugador;
+        }
+
+        procesarYRenderizarVistas();
+    } catch (error) {
+        console.error("Error al cargar datos:", error.message);
+        alert("No se pudieron sincronizar los datos con Supabase");
+    }
+}
+
+// Inserta una nueva fila en la tabla de Supabase
+async function guardarEstadisticas(event) {
     event.preventDefault();
 
     const nombre = document.getElementById('player-name').value;
@@ -57,88 +79,40 @@ function guardarEstadisticas(event) {
 
     if (!nombre || !agente) return;
 
-    // Respetamos la estructura original para heredar todos tus datos guardados
-    if (!baseDatos[nombre]) {
-        baseDatos[nombre] = {
-            totales: { partidas: 0, kills: 0, deaths: 0, assists: 0, acs: 0 },
-            agentes: {}
-        };
+    try {
+        const { error } = await supabase
+            .from('partidas')
+            .insert([
+                { jugador: nombre, agente: agente, kills: k, deaths: d, assists: a, acs: acs }
+            ]);
+
+        if (error) throw error;
+
+        jugadorActivoTab = nombre;
+
+        // Limpiar el formulario
+        document.getElementById('stats-form').reset();
+
+        // Recargar datos actualizados de la nube
+        await cargarDatosDesdeSupabase();
+
+    } catch (error) {
+        console.error("Error al guardar:", error.message);
+        alert("Error al enviar la partida a Supabase");
     }
+}
 
-    if (!baseDatos[nombre].agentes[agente]) {
-        baseDatos[nombre].agentes[agente] = { partidas: 0, kills: 0, deaths: 0, assists: 0, acs: 0 };
-    }
+// Función auxiliar para verificar si una fecha está dentro de los últimos 7 días
+function esDeEstaSemana(fechaString) {
+    const fechaPartida = new Date(fechaString);
+    const sieteDiasEnMilisegundos = 7 * 24 * 60 * 60 * 1000;
+    return (Date.now() - fechaPartida.getTime()) < sieteDiasEnMilisegundos;
+}
 
-    // Inicializar de forma segura la matriz histórica sin mutar lo anterior
-    if (!baseDatos[nombre].historialSemanal) {
-        baseDatos[nombre].historialSemanal = [];
-    }
-
-    // 1. Guardado acumulado (Los datos antiguos siguen vivos aquí y se siguen sumando)
-    baseDatos[nombre].totales.partidas += 1;
-    baseDatos[nombre].totales.kills += k;
-    baseDatos[nombre].totales.deaths += d;
-    baseDatos[nombre].totales.assists += a;
-    baseDatos[nombre].totales.acs += acs;
-
-    baseDatos[nombre].agentes[agente].partidas += 1;
-    baseDatos[nombre].agentes[agente].kills += k;
-    baseDatos[nombre].agentes[agente].deaths += d;
-    baseDatos[nombre].agentes[agente].assists += a;
-    baseDatos[nombre].agentes[agente].acs += acs;
-
-    // 2. Nuevo guardado cronológico (Permite aislar "Esta Semana")
-    baseDatos[nombre].historialSemanal.push({
-        agente: agente,
-        kills: k,
-        deaths: d,
-        assists: a,
-        acs: acs,
-        fecha: Date.now() // Guardamos la estampa de tiempo exacta
-    });
-
-    localStorage.setItem('valorant_squad_db', JSON.stringify(baseDatos));
-    
-    if (!jugadorActivoTab) jugadorActivoTab = nombre;
-
-    // Limpiar el formulario
-    document.getElementById('player-name').selectedIndex = 0;
-    document.getElementById('agent-name').selectedIndex = 0;
-    document.getElementById('kills').value = '';
-    document.getElementById('deaths').value = '';
-    document.getElementById('assists').value = '';
-    document.getElementById('acs').value = '';
-
+// Procesa el array plano global y actualiza la Tabla e Interfaz
+function procesarYRenderizarVistas() {
     actualizarTablaGeneral();
     renderizarPestañasAgentes();
-}
-
-// Función auxiliar: verifica si una partida se jugó dentro de los últimos 7 días
-function esDeEstaSemana(timestampFecha) {
-    const sieteDiasEnMiliesgundos = 7 * 24 * 60 * 60 * 1000;
-    return (Date.now() - timestampFecha) < sieteDiasEnMiliesgundos;
-}
-
-function configurarEncabezadosOrdenables() {
-    const encabezados = document.querySelectorAll('th');
-    
-    encabezados.forEach(th => {
-        th.style.cursor = 'pointer';
-        th.title = 'Haz clic para ordenar';
-
-        th.addEventListener('click', () => {
-            const columna = th.innerText.replace(' ▲', '').replace(' ▼', '').trim();
-            
-            if (columnaOrdenada === columna) {
-                ordenAscendente = !ordenAscendente;
-            } else {
-                columnaOrdenada = columna;
-                ordenAscendente = false; 
-            }
-
-            actualizarTablaGeneral();
-        });
-    });
 }
 
 function actualizarTablaGeneral() {
@@ -146,50 +120,46 @@ function actualizarTablaGeneral() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    if (Object.keys(baseDatos).length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#9ca3af;">No hay datos registrados en la squad.</td></tr>`;
+    if (listaPartidasGlobal.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#9ca3af;">No hay datos registrados en la base de datos.</td></tr>`;
         return;
     }
 
-    let listaJugadores = [];
+    // Agrupamos dinámicamente según el filtro activo (Acumulado o Semanal)
+    let resumenJugadores = {};
 
-    for (let jugador in baseDatos) {
-        let datosProcesados = {};
-
-        if (filtroTemporal === "all") {
-            // Carga directa de datos acumulados históricos completos
-            datosProcesados = { ...baseDatos[jugador].totales };
-        } else {
-            // Filtra y suma dinámicamente el historial de partidas de los últimos 7 días
-            const historial = baseDatos[jugador].historialSemanal || [];
-            const partidasFiltradas = historial.filter(p => esDeEstaSemana(p.fecha));
-
-            if (partidasFiltradas.length === 0) continue; // Si no hay actividad semanal, no se renderiza
-
-            datosProcesados = partidasFiltradas.reduce((acc, p) => {
-                acc.partidas += 1;
-                acc.kills += p.kills;
-                acc.deaths += p.deaths;
-                acc.assists += p.assists;
-                acc.acs += p.acs;
-                return acc;
-            }, { partidas: 0, kills: 0, deaths: 0, assists: 0, acs: 0 });
+    listaPartidasGlobal.forEach(partida => {
+        if (filtroTemporal === "week" && !esDeEstaSemana(partida.fecha)) {
+            return; // Ignorar si el filtro es semanal y la partida es vieja
         }
 
-        if (datosProcesados.partidas === 0) continue;
+        const j = partida.jugador;
+        if (!resumenJugadores[j]) {
+            resumenJugadores[j] = { partidas: 0, kills: 0, deaths: 0, assists: 0, acs: 0 };
+        }
 
-        const p = datosProcesados.partidas;
-        const muertesEfectivas = Math.max(1, datosProcesados.deaths);
+        resumenJugadores[j].partidas += 1;
+        resumenJugadores[j].kills += partida.kills;
+        resumenJugadores[j].deaths += partida.deaths;
+        resumenJugadores[j].assists += partida.assists;
+        resumenJugadores[j].acs += partida.acs;
+    });
+
+    let listaJugadores = [];
+    for (let jugador in resumenJugadores) {
+        const data = resumenJugadores[jugador];
+        const p = data.partidas;
+        const muertesEfectivas = Math.max(1, data.deaths);
 
         listaJugadores.push({
             nombre: jugador,
             partidas: p,
-            kills: datosProcesados.kills,
-            deaths: datosProcesados.deaths,
-            assists: datosProcesados.assists,
-            kd: datosProcesados.kills / muertesEfectivas,
-            kdaRatio: (datosProcesados.kills + datosProcesados.assists) / muertesEfectivas,
-            acs: datosProcesados.acs / p
+            kills: data.kills,
+            deaths: data.deaths,
+            assists: data.assists,
+            kd: data.kills / muertesEfectivas,
+            kdaRatio: (data.kills + data.assists) / muertesEfectivas,
+            acs: data.acs / p
         });
     }
 
@@ -199,11 +169,10 @@ function actualizarTablaGeneral() {
         return;
     }
 
-    // Algoritmo de ordenamiento
+    // Ordenamiento de columnas
     if (columnaOrdenada) {
         listaJugadores.sort((a, b) => {
             let valA, valB;
-
             switch (columnaOrdenada) {
                 case 'JUGADOR': valA = a.nombre.toLowerCase(); valB = b.nombre.toLowerCase(); break;
                 case 'PARTIDAS': valA = a.partidas; valB = b.partidas; break;
@@ -213,14 +182,13 @@ function actualizarTablaGeneral() {
                 case 'ACS PROM.': valA = a.acs; valB = b.acs; break;
                 default: return 0;
             }
-
             if (valA < valB) return ordenAscendente ? -1 : 1;
             if (valA > valB) return ordenAscendente ? 1 : -1;
             return 0;
         });
     }
 
-    // Inyección de filas calculadas
+    // Renderizado físico en la tabla
     listaJugadores.forEach(jugador => {
         const avgK = (jugador.kills / jugador.partidas).toFixed(1);
         const avgD = (jugador.deaths / jugador.partidas).toFixed(1);
@@ -242,40 +210,28 @@ function actualizarTablaGeneral() {
     actualizarIndicadoresEncabezado();
 }
 
-function actualizarIndicadoresEncabezado() {
-    document.querySelectorAll('th').forEach(th => {
-        let textoBase = th.innerText.replace(' ▲', '').replace(' ▼', '');
-        
-        if (textoBase === columnaOrdenada) {
-            th.innerText = textoBase + (ordenAscendente ? ' ▲' : ' ▼');
-            th.style.color = '#ff4655'; 
-        } else {
-            th.innerText = textoBase;
-            th.style.color = '#9ca3af'; 
-        }
-    });
-}
-
 function renderizarPestañasAgentes() {
     const container = document.getElementById('tabs-container');
     if (!container) return;
     container.innerHTML = '';
 
-    const listaJugadores = Object.keys(baseDatos);
+    // Obtener lista única de jugadores que tienen al menos una partida registrada
+    const jugadoresUnicos = [...new Set(listaPartidasGlobal.map(p => p.jugador))];
 
-    if (listaJugadores.length === 0) {
+    if (jugadoresUnicos.length === 0) {
         container.innerHTML = `<p style="color: #9ca3af; text-align: center; padding: 20px;">Registra partidas para desbloquear las tarjetas de personajes.</p>`;
         return;
     }
 
-    if (!jugadorActivoTab || !baseDatos[jugadorActivoTab]) {
-        jugadorActivoTab = listaJugadores[0];
+    if (!jugadorActivoTab || !jugadoresUnicos.includes(jugadorActivoTab)) {
+        jugadorActivoTab = jugadoresUnicos[0];
     }
 
+    // Renderizar botones de navegación de pestañas
     const nav = document.createElement('div');
     nav.className = 'player-tabs-nav';
 
-    listaJugadores.forEach(jugador => {
+    jugadoresUnicos.forEach(jugador => {
         const btn = document.createElement('button');
         btn.className = `tab-button ${jugador === jugadorActivoTab ? 'active' : ''}`;
         btn.innerText = jugador;
@@ -290,33 +246,29 @@ function renderizarPestañasAgentes() {
     const grid = document.createElement('div');
     grid.className = 'agent-grid-display';
 
-    let agentesDelJugador = {};
+    // Agrupar estadísticas por agente para el jugador seleccionado
+    let agentesAgrupados = {};
 
-    if (filtroTemporal === "all") {
-        // Obtenemos los agentes acumulados directos de tu BD clásica
-        agentesDelJugador = baseDatos[jugadorActivoTab].agentes;
+    listaPartidasGlobal.forEach(p => {
+        if (p.jugador !== jugadorActivoTab) return;
+        if (filtroTemporal === "week" && !esDeEstaSemana(p.fecha)) return;
+
+        if (!agentesAgrupados[p.agente]) {
+            agentesAgrupados[p.agente] = { partidas: 0, kills: 0, deaths: 0, assists: 0, acs: 0 };
+        }
+
+        agentesAgrupados[p.agente].partidas += 1;
+        agentesAgrupados[p.agente].kills += p.kills;
+        agentesAgrupados[p.agente].deaths += p.deaths;
+        agentesAgrupados[p.agente].assists += p.assists;
+        agentesAgrupados[p.agente].acs += p.acs;
+    });
+
+    if (Object.keys(agentesAgrupados).length === 0) {
+        grid.innerHTML = `<p style="color: #9ca3af; padding: 10px;">Este jugador no registra partidas en el periodo seleccionado.</p>`;
     } else {
-        // Calculamos de forma aislada solo los personajes usados en los últimos 7 días
-        const historial = baseDatos[jugadorActivoTab].historialSemanal || [];
-        const partidasFiltradas = historial.filter(p => esDeEstaSemana(p.fecha));
-
-        partidasFiltradas.forEach(p => {
-            if (!agentesDelJugador[p.agente]) {
-                agentesDelJugador[p.agente] = { partidas: 0, kills: 0, deaths: 0, assists: 0, acs: 0 };
-            }
-            agentesDelJugador[p.agente].partidas += 1;
-            agentesDelJugador[p.agente].kills += p.kills;
-            agentesDelJugador[p.agente].deaths += p.deaths;
-            agentesDelJugador[p.agente].assists += p.assists;
-            agentesDelJugador[p.agente].acs += p.acs;
-        });
-    }
-
-    if (Object.keys(agentesDelJugador).length === 0) {
-        grid.innerHTML = `<p style="color: #9ca3af; padding: 10px;">Este jugador no registra partidas con personajes en este periodo.</p>`;
-    } else {
-        for (let agente in agentesDelJugador) {
-            const data = agentesDelJugador[agente];
+        for (let agente in agentesAgrupados) {
+            const data = agentesAgrupados[agente];
             const p = data.partidas;
 
             const avgK = (data.kills / p).toFixed(1);
@@ -344,13 +296,55 @@ function renderizarPestañasAgentes() {
     container.appendChild(grid);
 }
 
-function borrarTodo() {
-    if (confirm("¿Seguro que quieres borrar todo el historial (totales y agentes) de la squad?")) {
-        localStorage.removeItem('valorant_squad_db');
-        baseDatos = {};
-        jugadorActivoTab = "";
-        columnaOrdenada = "";
-        actualizarTablaGeneral();
-        renderizarPestañasAgentes();
+function configurarEncabezadosOrdenables() {
+    document.querySelectorAll('th').forEach(th => {
+        th.style.cursor = 'pointer';
+        th.title = 'Haz clic para ordenar';
+        th.addEventListener('click', () => {
+            const columna = th.innerText.replace(' ▲', '').replace(' ▼', '').trim();
+            if (columnaOrdenada === columna) {
+                ordenAscendente = !ordenAscendente;
+            } else {
+                columnaOrdenada = columna;
+                ordenAscendente = false; 
+            }
+            actualizarTablaGeneral();
+        });
+    });
+}
+
+function actualizarIndicadoresEncabezado() {
+    document.querySelectorAll('th').forEach(th => {
+        let textoBase = th.innerText.replace(' ▲', '').replace(' ▼', '');
+        if (textoBase === columnaOrdenada) {
+            th.innerText = textoBase + (ordenAscendente ? ' ▲' : ' ▼');
+            th.style.color = '#ff4655'; 
+        } else {
+            th.innerText = textoBase;
+            th.style.color = '#9ca3af'; 
+        }
+    });
+}
+
+// Borra todas las filas de la tabla en Supabase
+async function borrarTodo() {
+    if (confirm("¿Seguro que quieres eliminar TODO el historial de la base de datos en Supabase?")) {
+        try {
+            const { error } = await supabase
+                .from('partidas')
+                .delete()
+                .neq('id', 0); // Truco para borrar todas las filas de forma segura
+
+            if (error) throw error;
+
+            listaPartidasGlobal = [];
+            jugadorActivoTab = "";
+            columnaOrdenada = "";
+            procesarYRenderizarVistas();
+
+        } catch (error) {
+            console.error("Error al vaciar BD:", error.message);
+            alert("No se pudo limpiar la base de datos.");
+        }
     }
 }
