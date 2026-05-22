@@ -5,6 +5,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_2GFclghGWnF-dlUTCYK49A_QOuRzAcd";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Variables de estado de la aplicación
+let tiposSeleccionados = ["Premier", "Scrim", "Extra Torneo"];
 let listaPartidasGlobal = [];
 let jugadorActivoTab = ""; 
 let columnaOrdenada = ""; 
@@ -15,6 +16,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     const statsForm = document.getElementById('stats-form');
     const btnFilterAll = document.getElementById('filter-all');
     const btnFilterWeek = document.getElementById('filter-week');
+    const botonesTipo = document.querySelectorAll('#type-filters .btn-filter');
+    
+    botonesTipo.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        const tipo = e.target.getAttribute('data-type');
+        
+        // Si el tipo ya estaba seleccionado, lo quitamos y apagamos el botón
+        if (tiposSeleccionados.includes(tipo)) {
+            tiposSeleccionados = tiposSeleccionados.filter(t => t !== tipo);
+            e.target.classList.remove('active');
+        } else {
+            // Si no estaba, lo agregamos y prendemos el botón
+            tiposSeleccionados.push(tipo);
+            e.target.classList.add('active');
+        }
+        
+        // Actualizamos las tablas con los nuevos filtros
+        procesarYRenderizarVistas();
+        });
+    });
 
     if (statsForm) statsForm.addEventListener('submit', guardarEstadisticas);
 
@@ -65,8 +86,21 @@ async function cargarDatosDesdeSupabase() {
 async function guardarEstadisticas(event) {
     event.preventDefault();
 
+    // 1. DEFINES TU CONTRASEÑA AQUÍ (Cámbiala por la que tú prefieras)
+    const CONTRASEÑA_CORRECTA = "adwaya"; 
+    // 2. Capturamos lo que escribió el usuario en el nuevo campo
+    const passwordIntroducida = document.getElementById('form-password').value;
+
+    // 3. VALIDACIÓN: Si no coincide, frenamos todo y avisamos
+    if (passwordIntroducida !== CONTRASEÑA_CORRECTA) {
+        alert(" Contraseña incorrecta. No tienes permiso para añadir estadísticas.");
+        return; // Esto detiene la función y no envía nada a Supabase
+    }
+
+    // --- Si la clave es correcta, el código sigue corriendo de forma normal ---
     const nombre = document.getElementById('player-name').value;
     const agente = document.getElementById('agent-name').value;
+    const tipoPartida = document.getElementById('match-type').value;
     const k = parseInt(document.getElementById('kills').value) || 0;
     const d = parseInt(document.getElementById('deaths').value) || 0;
     const a = parseInt(document.getElementById('assists').value) || 0;
@@ -76,16 +110,26 @@ async function guardarEstadisticas(event) {
 
     try {
         const { error } = await supabaseClient
-            .from('stats') // aqui busca la tabla 'stats'
+            .from('stats')
             .insert([
-                { jugador: nombre, agente: agente, kills: k, deaths: d, assists: a, acs: acs }
+                { 
+                    jugador: nombre, 
+                    agente: agente, 
+                    kills: k, 
+                    deaths: d, 
+                    assists: a, 
+                    acs: acs,
+                    tipo_partida: tipoPartida
+                }
             ]);
 
         if (error) throw error;
 
+        // Si se guarda con éxito, reiniciamos el formulario (incluyendo el campo de contraseña)
         jugadorActivoTab = nombre;
         document.getElementById('stats-form').reset();
         await cargarDatosDesdeSupabase();
+        alert("Partida registrada con éxito.");
 
     } catch (error) {
         console.error("Error al guardar:", error.message);
@@ -122,6 +166,8 @@ function actualizarTablaGeneral() {
         if (filtroTemporal === "week" && !esDeEstaSemana(partida.created_at)) {
             return; 
         }
+        const tipoDeEstaPartida = partida.tipo_partida || 'Scrim';
+        if (!tiposSeleccionados.includes(tipoDeEstaPartida)) return;
 
         const j = partida.jugador;
         if (!resumenJugadores[j]) {
@@ -237,6 +283,9 @@ function renderizarPestañasAgentes() {
     listaPartidasGlobal.forEach(p => {
         if (p.jugador !== jugadorActivoTab) return;
         if (filtroTemporal === "week" && !esDeEstaSemana(p.created_at)) return;
+
+        const tipoDeEstaPartida = p.tipo_partida || 'Premier';
+        if (!tiposSeleccionados.includes(tipoDeEstaPartida)) return;
 
         if (!agentesAgrupados[p.agente]) {
             agentesAgrupados[p.agente] = { partidas: 0, kills: 0, deaths: 0, assists: 0, acs: 0 };

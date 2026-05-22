@@ -64,6 +64,14 @@
                             <option value="Vyse">Vyse</option>
                         </select>
                     </div>
+
+                    <div class="form-group">
+                        <label for="match-type">Tipo de Partida</label>
+                        <select id="match-type" required>
+                            <option value="Scrim" selected>Scrims</option> <option value="Premier">Premier</option>
+                            <option value="Extra Torneo">Extra Torneos</option>
+                         </select>
+                    </div>
                     
                     <div class="form-group">
                         <label for="kills">Kills (K)</label>
@@ -85,6 +93,11 @@
                         <input type="number" id="acs" min="0" placeholder="Promedio de Combate" required>
                     </div>
                 </div>
+
+                <div class="form-group">
+                    <label for="form-password">Key</label>
+                    <input type="password" id="form-password" placeholder="Introduce la clave para subir datos" required>
+                </div>
                 
                 <div class="form-actions">
                     <button type="submit" class="btn-submit">Guardar Estadísticas</button>
@@ -94,10 +107,15 @@
 
         <div class="card-panel">
             <div class="panel-header-flex">
-                <h2 class="section-title">Tabla General del Team</h2>
+                <h2 class="section-title">Tabla General de la Squad</h2>
                 <div class="filter-timeline-container">
                     <button id="filter-all" class="btn-filter active">Acumulado</button>
                     <button id="filter-week" class="btn-filter">Esta Semana</button>
+                </div>
+                <div class="filter-timeline-container" id="type-filters" style="margin-top: 15px;">
+                    <button data-type="Premier" class="btn-filter active">Premier</button>
+                    <button data-type="Scrim" class="btn-filter active">Scrims</button> 
+                    <button data-type="Extra Torneo" class="btn-filter active">Extra Torneos</button>
                 </div>
             </div>
             

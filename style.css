@@ -161,6 +161,7 @@ button[type="submit"], .btn-submit {
     cursor: pointer;
     transition: all 0.2s;
     box-shadow: 0 0 10px rgba(124, 58, 237, 0.3);
+    margin-top: 10px;
 }
 
 button[type="submit"]:hover {
